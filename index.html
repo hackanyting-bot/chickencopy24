@@ -64,6 +64,8 @@
         .marquee-box { overflow: hidden; white-space: nowrap; background: #fffde7; padding: 8px 12px; border-radius: 10px; border: 1px dashed #fbc02d; box-shadow: 0 2px 5px rgba(0,0,0,0.05); box-sizing: border-box; width: 100%; }
         .marquee-content { display: inline-block; color: #d32f2f; font-weight: bold; font-size: 1.1em; padding-left: 100%; animation: marquee-anim 12s linear infinite; }
         @keyframes marquee-anim { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+
+        .btn-seed { background-color: #ff9800; color: white; border: none; padding: 10px; border-radius: 10px; margin-bottom: 10px; width: 100%; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -148,7 +150,7 @@
 </div>
 
 <script>
-    // อัปเดตการเชื่อมต่อ Supabase ใหม่ตามที่คุณบารมีแจ้งไว้
+    // อัปเดตการเชื่อมต่อ Supabase คงไว้เป็นของเว็บไก่
     const SUPABASE_URL = 'https://bnovmyobcthvvtlgjzbm.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_zBeScPDuzqPA-qeP5IcOQw_DXsK70TK';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -157,7 +159,6 @@
     const CHAT_ID = '7006062970'; 
     const GROUP_CHAT_ID = '-1003862093556';
 
-    // โครงสร้าง Database ปรับให้คลีนขึ้น ตัดหมวดมาม่าออก เหลือแค่เมนูหลัก และ Extras
     let menuDB = { system_config:[], system_marquee:[], main_menu:[], extras:[], store_inventory:[] };
     let currentAdminMode = 'menu';
     let cart = [];
@@ -332,7 +333,7 @@
             allItemsMsg += `\n\n--- 🍗 [กล่องที่ ${index + 1}] ---\n${item.detail}\n💰 ราคากล่องนี้: ${item.price} บาท`;
         });
 
-        // รูปแบบข้อความยิงเข้า Telegram (ลอกโลจิกเดิมมาเป๊ะ)
+        // รูปแบบข้อความยิงเข้า Telegram
         let msg = `👤 ลูกค้า: ${fd.get('customer')}\n📱 โทร: ${fd.get('phone') || '-'}\n📍 วิธีรับ: ${fd.get('delivery_type')}\n🏠 ที่อยู่: ${fd.get('address') || '-'}\n📝 โน้ต: ${fd.get('note') || '-'}\n\n🛒 === รายการอาหาร (${cart.length} กล่อง) ===${allItemsMsg}\n\n====================\n💸 ยอดรวมทั้งบิล: ${grandTotal} บาท\n====================`;
 
         const send = (id) => fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
@@ -360,7 +361,6 @@
     function seedStoreData() {
         if(!confirm("ต้องการดึงรายการเมนูไก่เริ่มต้นทั้งหมดหรือไม่? (ข้อมูลเดิมจะถูกแทนที่)")) return;
         
-        // ข้อมูลตัวอย่างสำหรับร้านไก่โดยเฉพาะ
         const seedMainMenu = [
             {n:"ข้าวยำไก่ (copy)", p:50, s:true}, {n:"ข้าวยำไก่เกาหลี", p:50, s:true}, 
             {n:"ข้าวไก่ทอดซอสเกาหลี", p:50, s:true}, {n:"ไก่ทอดซอสพิซซ่า", p:50, s:true}, 
@@ -374,6 +374,18 @@
         menuDB.main_menu = seedMainMenu.map(x => ({ name: x.n, price: x.p, stock: x.s }));
         menuDB.extras = seedExtras.map(x => ({ name: x.n, price: x.p, stock: x.s }));
         
+        openAdmin();
+    }
+
+    // ฟังก์ชันใหม่สำหรับจัดการสต็อกวัตถุดิบ (Store)
+    function seedInventoryData() {
+        if(!confirm("ต้องการดึงรายการวัตถุดิบเริ่มต้นทั้งหมดใช่หรือไม่? (ข้อมูลเดิมในหน้า Store จะถูกแทนที่)")) return;
+        const seed = [
+            {n:"เนื้อไก่", s:true}, {n:"ข้าวสวย", s:true}, {n:"ไข่ไก่", s:true}, {n:"ไส้กรอก", s:true}, 
+            {n:"ซอสเกาหลี", s:true}, {n:"ซอสพิซซ่า", s:true}, {n:"ซอสทรัฟเฟิล", s:true}, 
+            {n:"กล่องใส่ข้าว", s:true}, {n:"ถุงหูหิ้ว", s:true}, {n:"ช้อน", s:true}
+        ];
+        menuDB.store_inventory = seed.map(x => ({ name: x.n, price: 0, stock: x.s }));
         openAdmin();
     }
 
@@ -409,7 +421,9 @@
 
             const shopDiv = document.createElement('div');
             shopDiv.style.cssText = "background: #f8d7da; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 2px solid #f5c6cb;";
-            shopDiv.innerHTML = `<h3 style="margin-top:0; color: #721c24;">🛑 สถานะร้าน</h3><button type="button" style="background: ${config.stock ? '#2e7d32' : '#d32f2f'}; color: white; padding: 15px; width: 100%; border: none; border-radius: 10px; font-size: 1.2em; font-weight: bold; cursor: pointer; margin-bottom: 10px;" onclick="toggleShopStatus()">${config.stock ? '🟢 ร้านกำลังเปิด (กดเพื่อปิดร้าน)' : '🔴 ร้านปิดอยู่ (กดเพื่อเปิดร้าน)'}</button><div style="display: ${config.stock ? 'none' : 'block'}; text-align: left; background: white; padding: 10px; border-radius: 8px;"><label>ปิดถึงวันที่ (เปิดอัตโนมัติ 23:59 น.):</label><input type="date" class="admin-input" style="width: 100%; margin-top: 5px; box-sizing: border-box;" value="${config.name}" onchange="updateReopenDate(this.value)"></div>`;
+            
+            // เพิ่มปุ่ม Store และ COGS แบบเดียวกับมาม่า
+            shopDiv.innerHTML = `<h3 style="margin-top:0; color: #721c24;">🛑 สถานะร้าน</h3><button type="button" style="background: ${config.stock ? '#2e7d32' : '#d32f2f'}; color: white; padding: 15px; width: 100%; border: none; border-radius: 10px; font-size: 1.2em; font-weight: bold; cursor: pointer; margin-bottom: 10px;" onclick="toggleShopStatus()">${config.stock ? '🟢 ร้านกำลังเปิด (กดเพื่อปิดร้าน)' : '🔴 ร้านปิดอยู่ (กดเพื่อเปิดร้าน)'}</button><button type="button" style="background: #5d4037; color: white; padding: 10px; width: 100%; border: none; border-radius: 10px; font-size: 1em; cursor: pointer; margin-bottom: 10px;" onclick="currentAdminMode='store'; openAdmin()">📦 จัดการสต็อกของสด (Store)</button><button type="button" style="background: #1976d2; color: white; padding: 10px; width: 100%; border: none; border-radius: 10px; font-size: 1em; cursor: pointer; margin-bottom: 10px;" onclick="window.location.href='cogs.html'">📊 คำนวณต้นทุน</button><div style="display: ${config.stock ? 'none' : 'block'}; text-align: left; background: white; padding: 10px; border-radius: 8px;"><label>ปิดถึงวันที่ (เปิดอัตโนมัติ 23:59 น.):</label><input type="date" class="admin-input" style="width: 100%; margin-top: 5px; box-sizing: border-box;" value="${config.name}" onchange="updateReopenDate(this.value)"></div>`;
             area.appendChild(shopDiv);
 
             if(!menuDB.system_marquee) menuDB.system_marquee = [];
@@ -422,13 +436,21 @@
             area.appendChild(marqueeDiv);
 
             for (let section in menuDB) { if (section !== 'system_config' && section !== 'system_marquee' && section !== 'store_inventory') renderAdminSection(section, area); }
+        } else {
+            // โหมด Store (จัดการวัตถุดิบ)
+            document.getElementById('adminModalTitle').innerText = "📦 Store Inventory (สต็อกวัตถุดิบ)";
+            const btnWrap = document.createElement('div');
+            btnWrap.innerHTML = `<button type="button" style="width:100%; padding:10px; margin-bottom:10px; background:#666; color:white; border:none; border-radius:10px; cursor:pointer;" onclick="currentAdminMode='menu'; openAdmin()">⬅️ กลับหน้าจัดการเมนู</button><button type="button" class="btn-seed" onclick="seedInventoryData()">🔄 ดึงรายการวัตถุดิบตั้งต้น (ไม่ต้องพิมพ์เอง)</button>`;
+            area.appendChild(btnWrap);
+            if(!menuDB.store_inventory) menuDB.store_inventory = [];
+            renderAdminSection('store_inventory', area);
         }
         document.getElementById('adminInventoryModal').style.display = 'flex';
     }
 
     function renderAdminSection(section, area) {
         const secDiv = document.createElement('div'); secDiv.className = 'admin-section';
-        secDiv.innerHTML = `<b>หมวด: ${section === 'main_menu' ? 'เมนูหลัก' : 'ท็อปปิ้งเสริม'}</b>`;
+        secDiv.innerHTML = `<b>หมวด: ${section === 'main_menu' ? 'เมนูหลัก' : (section === 'extras' ? 'ท็อปปิ้งเสริม' : section)}</b>`;
         menuDB[section].forEach((item, index) => {
             const row = document.createElement('div'); row.className = 'admin-item-row';
             row.innerHTML = `<input type="text" class="admin-input" style="flex:2" value="${item.name}" onchange="menuDB['${section}'][${index}].name=this.value"><input type="number" class="admin-input" style="width:60px" value="${item.price}" onchange="menuDB['${section}'][${index}].price=parseInt(this.value)"><button type="button" class="status-toggle ${item.stock?'status-on':'status-off'}" onclick="menuDB['${section}'][${index}].stock=!menuDB['${section}'][${index}].stock; openAdmin()">${item.stock?'มีของ':'หมด'}</button><button type="button" class="btn-del" onclick="menuDB['${section}'].splice(${index}, 1); openAdmin()">❌</button>`;
@@ -453,6 +475,15 @@
             }
             if (list.length > 0) { const { error: insError } = await _supabase.from('menu_items').insert(list); if(insError) throw insError; }
             
+            // แจ้งเตือนเข้า Telegram เมื่ออยู่ในโหมด Store
+            if(currentAdminMode === 'store') {
+                let avail = ""; let out = "";
+                menuDB.store_inventory.forEach(item => { if(item.stock) avail += `\n ✅ ${item.name} (${item.price})`; else out += `\n ❌ ${item.name} (${item.price})`; });
+                let storeMsg = `📦 รายงานสต็อกวัตถุดิบ (Store Update)\n------------------\n🟢 มีของอยู่:${avail || '\n- ไม่มี -'}\n\n🔴 ของหมด/ต้องซื้อ:${out || '\n- ไม่มี -'}`;
+                const sendTG = (id) => fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ chat_id: id, text: storeMsg }) });
+                await Promise.all([sendTG(CHAT_ID), sendTG(GROUP_CHAT_ID)]);
+            }
+
             alert('บันทึกสำเร็จ!'); document.getElementById('adminInventoryModal').style.display = 'none'; location.reload();
         } catch (e) { console.error(e); alert('บันทึกไม่สำเร็จ: ' + e.message); } finally { loader.style.display = 'none'; }
     }

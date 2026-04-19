@@ -114,8 +114,8 @@
         <div class="menu-item">
             <span class="section-title">🛵 วิธีการรับสินค้า</span>
             <select name="delivery_type" id="delivery_type" class="input-text" onchange="handleDeliveryChange(this.value)">
-                <option value="รับเองที่ร้าน">รับเองที่ร้าน</option>
-                <option value="จัดส่ง (Delivery)">จัดส่ง (Delivery)</option>
+                <option value="pickup">รับเองที่ร้าน</option>
+                <option value="delivery">จัดส่ง (Delivery)</option>
             </select>
         </div>
 
@@ -161,9 +161,9 @@
 </div>
 
 <script>
-    // การเชื่อมต่อ Supabase สำหรับร้านไก่ (แยกโปรเจกต์)
-    const SUPABASE_URL = 'https://bnovmyobcthvvtlgjzbm.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_zBeScPDuzqPA-qeP5IcOQw_DXsK70TK';
+    // ใช้ Supabase ตัวเดียวกับหน้า Tracking
+    const SUPABASE_URL = 'https://chomrpeichvhabaslsvr.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNob21ycGVpY2h2aGFiYXNsc3ZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NjU5NjksImV4cCI6MjA5MDA0MTk2OX0.jC122_jMSTIh7kcRNCBxfR_OcPQYfjByMzdnoz6Qa_s';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const TELEGRAM_TOKEN = '7795027949:AAGsiPU4FFfoZuXKoDXLqgXlEqmBeEKwnuA';
@@ -249,7 +249,7 @@
     }
 
     function handleDeliveryChange(v) { 
-        document.getElementById('address_section').style.display = (v.includes('จัดส่ง')) ? 'block' : 'none'; 
+        document.getElementById('address_section').style.display = (v === 'delivery') ? 'block' : 'none'; 
     }
 
     function buildCurrentItemString(fd) {
@@ -335,7 +335,8 @@
             allItemsMsg += `\n\n--- 🍗 [กล่องที่ ${index + 1}] ---\n${item.detail}\n💰 ราคากล่องนี้: ${item.price} บาท`;
         });
 
-        let msg = `👤 ลูกค้า: ${fd.get('customer')}\n📱 โทร: ${fd.get('phone') || '-'}\n📍 วิธีรับ: ${fd.get('delivery_type')}\n🏠 ที่อยู่: ${fd.get('address') || '-'}\n📝 โน้ต: ${fd.get('note') || '-'}\n\n🛒 รายการอาหาร (${cart.length} กล่อง):${allItemsMsg}\n\n====================\n💸 ยอดรวมทั้งบิล: ${grandTotal} บาท\n====================`;
+        const deliveryType = fd.get('delivery_type');
+        let msg = `👤 ลูกค้า: ${fd.get('customer')}\n📱 โทร: ${fd.get('phone') || '-'}\n📍 วิธีรับ: ${deliveryType === 'delivery' ? 'จัดส่ง' : 'รับเอง'}\n🏠 ที่อยู่: ${fd.get('address') || '-'}\n📝 โน้ต: ${fd.get('note') || '-'}\n\n🛒 รายการอาหาร (${cart.length} กล่อง):${allItemsMsg}\n\n====================\n💸 ยอดรวมทั้งบิล: ${grandTotal} บาท\n====================`;
 
         const sendTG = (id) => fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
             method: 'POST',
@@ -344,25 +345,31 @@
         });
         
         try {
-            // บันทึกลง Supabase ของร้านไก่ เพื่อให้ tracking ดึงข้อมูลได้
+            // บันทึกลง Supabase (ตารางเดียวกับที่ Tracking ใช้)
             const { error: dbErr } = await _supabase.from('orders').insert([{
                 customer_name: fd.get('customer'),
                 customer_phone: fd.get('phone'),
                 order_details: allItemsMsg,
                 total_price: grandTotal,
-                delivery_type: fd.get('delivery_type'),
+                delivery_type: deliveryType,
                 status: 'cooking'
             }]);
 
+            if (dbErr) throw dbErr;
+
             await Promise.all([sendTG(CHAT_ID), sendTG(GROUP_CHAT_ID)]);
             
+            // บันทึกชื่อและเบอร์ลง LocalStorage สำหรับ Tracking
+            localStorage.setItem('customerName', fd.get('customer'));
+            localStorage.setItem('customerPhone', fd.get('phone'));
+
             document.getElementById('modal_total').innerText = "ยอดชำระทั้งหมด: " + grandTotal + " บาท";
             document.getElementById('paymentModal').style.display = 'flex';
             cart = [];
             updateCartUI();
         } catch (err) { 
             console.error(err);
-            alert('เกิดข้อผิดพลาดในการส่งข้อมูล'); 
+            alert('เกิดข้อผิดพลาดในการส่งข้อมูล: ' + err.message); 
         } finally { 
             btn.disabled = false; 
             btn.innerText = "✅ ยืนยันการสั่งอาหารทั้งหมด"; 
